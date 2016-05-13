@@ -3,7 +3,7 @@ module Test where
 import Graphics.Element exposing (..)
 import ElmTest exposing
   ( Test
-  , suite, test, assertEqual
+  , suite, test, assertEqual, assert
   , elementRunner, stringRunner
   )
 
@@ -250,11 +250,59 @@ concatVertical = suite "Append row"
   ]
 
 concatHorizontal : Test
-concatHorizontal = suite "Append column"
-  [ test "add a column to the end"
-      <| assertEqual (Just <| Matrix.repeat 2 2 2)
-      <|  Matrix.concatHorizontal (Matrix.repeat 1 2 2) (Matrix.repeat 1 2 2)
-  ]
+concatHorizontal =
+  let
+  --buildMatrix : (Int, Int) -> Maybe (Matrix Int)
+    buildMatrix (width', height') =
+      Matrix.fromList <| List.repeat height' [1..width']
+
+    andMap : Maybe (a -> b) -> Maybe a -> Maybe b
+    andMap f x = x `Maybe.andThen`
+                      (\x' -> f `Maybe.andThen` (\f' -> Just <| f' x'))
+
+    join : Maybe (Maybe a) -> Maybe a
+    join mx =
+      case mx of
+        Just x -> x
+        Nothing -> Nothing
+  in
+    suite "Concatenate horizontally (appending columns)"
+      ([ test "add a column to the end"
+          <| assertEqual (Just <| Matrix.repeat 2 2 2)
+          <|  Matrix.concatHorizontal (Matrix.repeat 1 2 2) (Matrix.repeat 1 2 2)
+      , test "add matrices sized 32x32"
+          <| assert
+          <| ( .size >> (==) (64,32) )
+          <|
+            case
+              join
+              <| Matrix.concatHorizontal
+                `Maybe.map` buildMatrix (32,32)
+                `andMap` buildMatrix (32,32)
+            of
+              Just matrix ->
+                matrix
+              Nothing ->
+                Debug.crash "Matrices were not equal in height."
+      ] ++ if True -- change to false to omit the crashing test
+        then
+          [test "add matrices sized 33x33, this will cause a runtime crash"
+            <| assert
+            <| ( .size >> (==) (66,32) )
+            <|
+              case
+                join
+                <| Matrix.concatHorizontal
+                  `Maybe.map` buildMatrix (33,32)
+                  `andMap` buildMatrix (33,32)
+              of
+                Just matrix ->
+                  matrix
+                Nothing ->
+                  Debug.crash """Matrices were not equal in height, or were
+                    improperly constructed."""]
+        else []
+        )
 
 add : Test
 add = suite "Add"
